@@ -533,14 +533,17 @@ const authPage=document.getElementById('nxAuthPage'),mount=document.getElementBy
 const slot=document.getElementById('nxProfileAccountSlot');
 if(!authPage||!mount||!account||!wallet)return;
 mount.appendChild(account);
-function loggedIn(){return document.getElementById('authSignedIn')?.style.display!=='none';}
+function loggedIn(){return document.getElementById('authSignedIn')?.style.display==='block';}
 function sync(){const yes=loggedIn();wallet.hidden=!yes;const header=document.getElementById('nxHeaderLogin');if(header){header.textContent=yes?'My Profile':'Login / Sign Up';header.href=yes?'#profile':'#login';}const prompt=document.getElementById('nxProfileLoginPrompt');if(prompt)prompt.hidden=yes;}
 function openAuth(){authPage.hidden=false;document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('authEmail')?.focus(),30);}
 function closeAuth(){authPage.hidden=true;document.body.style.overflow='';}
 window.nxOpenAuthPage=openAuth;
+window.addEventListener('error',e=>{if(!authPage.hidden){const msg=document.getElementById('authMessage');if(msg)msg.textContent='Login script error: '+e.message;} });
+window.addEventListener('unhandledrejection',e=>{if(!authPage.hidden){const msg=document.getElementById('authMessage');if(msg)msg.textContent='Connection error: '+(e.reason?.message||String(e.reason));}});
 window.nxCloseAuthPage=closeAuth;
 document.getElementById('nxAuthClose').addEventListener('click',closeAuth);
-document.getElementById('nxHeaderLogin')?.addEventListener('click',function(e){if(!loggedIn()){e.preventDefault();openAuth();}});
+document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;if(el.id==='nxHeaderLogin'&&!loggedIn()){e.preventDefault();openAuth();}},true);
+document.getElementById('nxHeaderLogin')?.addEventListener('click',function(e){e.preventDefault();if(loggedIn()){document.getElementById('profile')?.scrollIntoView({behavior:'smooth'});}else{openAuth();}});
 document.getElementById('nxProfileLoginBtn')?.addEventListener('click',openAuth);
 document.querySelectorAll('a[href="#account"],a[href="#login"]').forEach(a=>{if(a.id==='nxHeaderLogin')return;a.addEventListener('click',e=>{e.preventDefault();openAuth();});});
 document.querySelector('.nx-mobile-bar')?.addEventListener('click',e=>{const b=e.target.closest('[data-nx-go="profile"]');if(b&&!loggedIn()){e.stopImmediatePropagation();openAuth();}} ,true);
