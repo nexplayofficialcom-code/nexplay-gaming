@@ -554,4 +554,55 @@ window.addEventListener('hashchange',()=>{if(location.hash==='#login'){openAuth(
 if(location.hash==='#login')openAuth();
 sync();
 })();
+</script><script>
+/* Independent auth bootstrap: login UI works even if the tournament module fails. */
+(()=>{
+ const get=id=>document.getElementById(id);
+ const auth=get('nxAuthPage'),wallet=get('walletSection'),signin=get('authSignedIn'),signout=get('authSignedOut');
+ if(!auth||!wallet)return;
+ let client=null, busy=false, activeUser=null;
+ const status=t=>{const el=get('authMessage');if(el)el.textContent=t;};
+ const showPage=()=>{auth.hidden=false;document.body.style.overflow='hidden';setTimeout(()=>get('authEmail')?.focus(),50);};
+ const closePage=()=>{auth.hidden=true;document.body.style.overflow='';};
+ function render(user){activeUser=user||null;wallet.hidden=!user;
+   if(signin)signin.style.display=user?'block':'none';if(signout)signout.style.display=user?'none':'block';
+   const header=get('nxHeaderLogin');if(header){header.textContent=user?'My Profile':'Login / Sign Up';header.href=user?'#profile':'#login';}
+   const prompt=get('nxProfileLoginPrompt');if(prompt)prompt.hidden=!!user;
+   const label=get('authUser');if(label&&user)label.textContent=user.email||'Logged in';
+ }
+ async function getClient(){if(client)return client;
+   const module=await import('https://esm.sh/@supabase/supabase-js@2');
+   client=module.createClient('https://akvyshzydeyojoptnfaa.supabase.co','sb_publishable_UPyfIkofd1_tFFRJBqhYrg_M3H-20L7', {auth:{storageKey:'nexplay-auth'}});
+   return client;
+ }
+ async function run(kind){if(busy)return;const email=get('authEmail')?.value.trim(),password=get('authPassword')?.value||'';
+   if(!email||!password){status('Email aur password bharo.');return;}
+   if(password.length<6){status('Password kam se kam 6 characters ka hona chahiye.');return;}
+   busy=true;status('Connecting to Supabase…');
+   const buttons=[get('authLogin'),get('authSignup')];buttons.forEach(b=>{if(b)b.disabled=true});
+   try{const c=await getClient();status(kind==='signup'?'Creating account…':'Signing in…');
+     const {data,error}=kind==='signup'?await c.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}):await c.auth.signInWithPassword({email,password});
+     if(error)throw error;
+     if(data.session?.user){render(data.session.user);status('Login successful!');closePage();location.hash='#home';}
+     else status('Account created. Email verification link check karo, phir Login karo.');
+   }catch(err){status('Login error: '+(err?.message||String(err))+'. Internet / Supabase connection check karo.');}
+   finally{busy=false;buttons.forEach(b=>{if(b)b.disabled=false})}
+ }
+ document.addEventListener('click',e=>{
+   const login=e.target.closest('#nxHeaderLogin,#nxProfileLoginBtn');
+   if(login&&!activeUser){e.preventDefault();e.stopImmediatePropagation();showPage();return;}
+   const action=e.target.closest('#authLogin,#authSignup');
+   if(action){e.preventDefault();e.stopImmediatePropagation();run(action.id==='authSignup'?'signup':'login');return;}
+   if(e.target.closest('#nxAuthClose')){e.preventDefault();e.stopImmediatePropagation();closePage();return;}
+   if(e.target.closest('#authLogout')){e.preventDefault();e.stopImmediatePropagation();(async()=>{try{const c=await getClient();const {error}=await c.auth.signOut();if(error)throw error;render(null);status('Logged out.');}catch(err){status('Logout error: '+err.message)}})();return;}
+   const profile=e.target.closest('.nx-mobile-bar [data-nx-go="profile"]');
+   if(profile&&!activeUser){e.preventDefault();e.stopImmediatePropagation();showPage();}
+ },true);
+ // Hide wallet until session is confirmed. UI should never rely on a CSS-only login check.
+ render(null);
+ getClient().then(async c=>{
+   c.auth.onAuthStateChange((_event,session)=>{render(session?.user||null);if(session?.user&& !auth.hidden)closePage();});
+   const {data,error}=await c.auth.getSession();if(error)throw error;render(data?.session?.user||null);
+ }).catch(err=>{status('Supabase connection failed: '+(err?.message||err));});
+})();
 </script></body></html>
